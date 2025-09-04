@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "NTHU Verify Code Extension",
+  "version": "1.0",
+
+  "host_permissions": [
+    "https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/*"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["reference/*.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/index.php",
+        "https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/"
+        ],
+      "js": [
+        "lib/functions.js",
+        "lib/data.js",
+        "content.js"
+      ]
+    }
+  ]
+}
