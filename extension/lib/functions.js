@@ -61,12 +61,30 @@ function rgb2bin(canvas, threshold = 128) {
 }
 
 // B. Flood-fill 切割數字
-function splitDigitsByFloodFill(bin) {
+function splitDigitsByFloodFill(bin, canvas, tolerance = 30, minPixels = 20) {
   const h = bin.length;
   const w = bin[0].length;
+
   const visited = Array.from({ length: h }, () => Array(w).fill(false));
 
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  function getColor(x, y) {
+    const i = (y * w + x) * 4;
+    return [data[i], data[i + 1], data[i + 2]];
+  }
+
+  function colorsSimilar(c1, c2, tol = 30) {
+    const dr = c1[0] - c2[0];
+    const dg = c1[1] - c2[1];
+    const db = c1[2] - c2[2];
+    return (dr * dr + dg * dg + db * db) <= tol * tol;
+  }
+
   function floodFill(sx, sy) {
+    const baseColor = getColor(sx, sy);
     let queue = [[sx, sy]];
     let pixels = [];
     let minX = w, maxX = 0, minY = h, maxY = 0;
@@ -75,15 +93,18 @@ function splitDigitsByFloodFill(bin) {
       const [x, y] = queue.pop();
       if (x < 0 || x >= w || y < 0 || y >= h) continue;
       if (visited[y][x]) continue;
-      if (bin[y][x] !== 1) continue;
+      if (bin[y][x] !== 1) continue; // 必須是數字區域
+
+      const color = getColor(x, y);
+      if (!colorsSimilar(color, baseColor, tolerance)) continue; // 必須顏色相似
 
       visited[y][x] = true;
       pixels.push([x, y]);
 
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
 
       queue.push([x + 1, y]);
       queue.push([x - 1, y]);
@@ -91,7 +112,8 @@ function splitDigitsByFloodFill(bin) {
       queue.push([x, y - 1]);
     }
 
-    if (pixels.length === 0) return null;
+    // 🚨 過濾掉太小的雜點
+    if (pixels.length < minPixels) return null;
 
     const digitH = maxY - minY + 1;
     const digitW = maxX - minX + 1;
@@ -114,9 +136,13 @@ function splitDigitsByFloodFill(bin) {
     }
   }
 
+  // 按 X 排序，保持數字順序
   results.sort((a, b) => a.x - b.x);
+
   return results.map(r => r.array);
 }
+
+
 
 // C. 二值陣列 → Canvas
 function bin2canvas(arr) {
@@ -273,7 +299,7 @@ function xorDifference(arrA, arrB) {
       if (arrA[y][x] !== arrB[y][x]) diff++;
     }
   }
-  return diff;
+  return 100*diff/(h*w);
 }
 
 function canvasToArray(canvas, threshold = 128) {
@@ -346,4 +372,188 @@ function joinDigitsCanvas(digitCanvases, gap = 2) {
   }
 
   return canvas;
+}
+
+function xorCanvas(canvasA, canvasB) {
+  const w = Math.min(canvasA.width, canvasB.width);
+  const h = Math.min(canvasA.height, canvasB.height);
+
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const ctx = out.getContext("2d");
+
+  const dataA = canvasA.getContext("2d", { willReadFrequently: true })
+    .getImageData(0, 0, w, h).data;
+  const dataB = canvasB.getContext("2d", { willReadFrequently: true })
+    .getImageData(0, 0, w, h).data;
+
+  const imgData = ctx.createImageData(w, h);
+  const outData = imgData.data;
+
+  for (let i = 0; i < dataA.length; i += 4) {
+    const a = dataA[i] < 128 ? 1 : 0;
+    const b = dataB[i] < 128 ? 1 : 0;
+    if (a === 1 && b === 1) {
+      // 重疊 → 紅
+      outData[i] = 255; outData[i + 1] = 0; outData[i + 2] = 0; outData[i + 3] = 255;
+    } else {
+      // 其他 → 白
+      outData[i] = 255; outData[i + 1] = 255; outData[i + 2] = 255; outData[i + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  return out;
+}
+
+
+
+
+
+function showVisualization(results) {
+  const captchaInput = document.querySelector('div[align="left"][style*="border-style: solid"]');
+  if (!captchaInput) return;
+
+  // 清掉舊的
+  const oldViz = document.getElementById("captcha-visualize");
+  if (oldViz) oldViz.remove();
+
+  let viz = document.createElement("div");
+  viz.id = "captcha-visualize";
+  viz.style.marginTop = "10px";
+  viz.style.padding = "10px";
+  viz.style.border = "1px solid #ccc";
+  viz.style.background = "#fafafa";
+  viz.style.fontFamily = "monospace";
+
+  results.forEach(r => {
+    const row = document.createElement("div");
+    row.style.marginBottom = "16px";
+
+    const title = document.createElement("div");
+    title.textContent = `Digit ${r.i}`;
+    row.appendChild(title);
+    row.appendChild(r.canvas);
+
+    // 找最佳匹配
+    let bestDigit = null;
+    let bestScore = -Infinity;
+    for (let d in r.scores) {
+      const sim = 100 - r.scores[d]; // 相似度
+      if (sim > bestScore) {
+        bestScore = sim;
+        bestDigit = d;
+      }
+    }
+
+    // 顯示 XOR 疊圖
+    let grid = document.createElement("div");
+    grid.style.display = "grid";
+    grid.style.gridTemplateColumns = "repeat(5, auto)";
+    grid.style.gap = "8px";
+
+    for (let d = 0; d <= 9; d++) {
+      const cell = document.createElement("div");
+      cell.style.textAlign = "center";
+
+      const diffCanvas = r.visuals[d];
+      diffCanvas.style.border = (d == bestDigit)
+        ? "2px solid green"
+        : "1px solid #ccc";
+
+      const label = document.createElement("div");
+      const sim = 100 - r.scores[d]; // 相似度
+      label.textContent = `${d}: ${sim.toFixed(1)}%`;
+      if (d == bestDigit) {
+        label.style.color = "green";
+        label.style.fontWeight = "bold";
+      }
+
+      cell.appendChild(diffCanvas);
+      cell.appendChild(label);
+      grid.appendChild(cell);
+    }
+
+    row.appendChild(grid);
+    viz.appendChild(row);
+  });
+
+  // 插到驗證碼輸入框的最後面
+  captchaInput.insertAdjacentElement("afterend", viz);
+}
+
+
+
+
+function disambiguate(num, digitArray) {
+  const h = digitArray.length;
+  const w = digitArray[0].length;
+
+  // 0 vs 9
+  if (num === 0 || num === 9) {
+    const x = Math.floor(w / 3); // 從左邊數過來 1/3 的直線
+
+    let groups = 0;
+    let inBlack = false;
+
+    for (let y = 0; y < h; y++) {
+      if (digitArray[y][x] === 1) {
+        if (!inBlack) {
+          groups++;
+          inBlack = true;
+        }
+      } else {
+        inBlack = false;
+      }
+    }
+
+    return groups === 1 ? 9 : 0;
+  }
+
+  // 2 vs 3
+  if (num === 2 || num === 3) {
+    const midX = Math.floor(w / 2);
+
+    let sumY = 0;
+    let count = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < midX; x++) { // 只看左半邊
+        if (digitArray[y][x] === 1) {
+          sumY += y;
+          count++;
+        }
+      }
+    }
+
+    if (count === 0) return num; // fallback
+
+    const centroidY = sumY / count;
+    const centerY = h / 2;
+
+    // 偏上 → 2，偏下 → 3
+    return centroidY < centerY ? 2 : 3;
+  }
+  if (num==1||num==7){
+    const h = digitArray.length;
+    const w = digitArray[0].length;
+
+    let minY = h; // 右半部最上方的黑像素
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+        if (digitArray[y][x] === 1) {
+            if (y < minY) minY = y;
+        }
+        }
+    }
+
+    if (minY === h) return 1; // fallback 沒找到 → 當成 1
+
+    // 如果最上方黑點距離頂邊很近 → 7
+    const threshold = Math.floor(h * 0.2); // 10% 高度
+    return minY <= threshold ? 7 : 1; 
+    }
+    console.log("Error")
+  return num;
 }

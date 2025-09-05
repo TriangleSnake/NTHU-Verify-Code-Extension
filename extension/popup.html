@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8" />
+  <title>NTHU Verify – Debug</title>
+  <style>
+    body {
+      margin: 0; padding: 16px;
+      font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", Arial, sans-serif;
+      width: 320px; /* 讓 popup 大一點 */
+      background: #f7f7f8;
+    }
+    h1 {
+      font-size: 20px; margin: 0 0 12px 0; font-weight: 700;
+    }
+    .card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+      padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .big-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px; border: 2px solid #e5e7eb; border-radius: 16px;
+      cursor: pointer; user-select: none;
+    }
+    .label {
+      font-size: 18px; font-weight: 700;
+    }
+    /* 自製超大 switch */
+    .switch {
+      position: relative; width: 96px; height: 52px;
+      background: #e5e7eb; border-radius: 52px; transition: background .2s ease;
+      border: 2px solid #d1d5db;
+    }
+    .knob {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      left: 4px; width: 44px; height: 44px; border-radius: 50%;
+      background: white; box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      transition: left .2s ease;
+    }
+    .on .switch { background: #22c55e; border-color: #16a34a; }
+    .on .knob { left: 48px; }
+    .hint {
+      margin-top: 12px; font-size: 13px; color: #6b7280;
+    }
+    .status {
+      margin-top: 10px; font-size: 14px; font-weight: 600;
+    }
+    .status.on { color: #16a34a; }
+    .status.off { color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <h1>NTHU Verify Code Extension</h1>
+  <div class="card">
+    <div id="toggle" class="big-toggle">
+      <div class="label">Debug Mode</div>
+      <div class="switch"><div class="knob"></div></div>
+    </div>
+    <div id="status" class="status off">目前狀態：OFF</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

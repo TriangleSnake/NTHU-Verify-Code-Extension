@@ -1,11 +1,15 @@
 {
   "manifest_version": 3,
   "name": "NTHU Verify Code Extension",
-  "version": "1.0",
-
+  "version": "1.1",
+  "permissions": ["storage"],
   "host_permissions": [
     "https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/*"
   ],
+  "action": {
+    "default_title": "NTHU Verify",
+    "default_popup": "popup.html"
+  },
 
   "content_scripts": [
     {
